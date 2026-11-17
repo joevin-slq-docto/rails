@@ -2668,8 +2668,10 @@ Sends `Content-Security-Policy: sandbox` with responses whose
 scripts in the origin of the application. It is enforced in addition to any
 other `Content-Security-Policy` on these responses.
 
-Set it to sandbox values, such as `"allow-scripts"`, to relax the sandbox. A
-controller can override it with `sandbox_inline_content`.
+Set it to sandbox values, such as `"allow-scripts"` or
+`%w[allow-scripts allow-popups]`, to relax the sandbox. A controller can
+override it with `sandbox_inline_content`. `policy.sandbox` does not relax it:
+browsers enforce both.
 
 The default value depends on the `config.load_defaults` target version:
 

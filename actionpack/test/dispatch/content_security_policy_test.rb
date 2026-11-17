@@ -402,6 +402,15 @@ class ContentSecurityPolicyMiddlewareTest < ActiveSupport::TestCase
     assert_equal "#{@default_csp}, sandbox", content_security_policy_for("inline", { ActionDispatch::Constants::CONTENT_SECURITY_POLICY => @default_csp })
   end
 
+  def test_sandbox_is_added_to_sandbox_of_content_security_policy
+    @env["action_dispatch.sandbox_inline_content"] = true
+    @env["action_dispatch.content_security_policy"] = ActionDispatch::ContentSecurityPolicy.new do |p|
+      p.sandbox "allow-scripts"
+    end
+
+    assert_equal "sandbox allow-scripts, sandbox", content_security_policy_for("inline")
+  end
+
   def test_sandbox_is_enforced_when_content_security_policy_is_report_only_or_missing
     @env["action_dispatch.sandbox_inline_content"] = true
 
