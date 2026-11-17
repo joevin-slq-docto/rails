@@ -66,6 +66,24 @@ module ActionController # :nodoc:
           request.content_security_policy_report_only = report_only
         end
       end
+
+      # Overrides `config.action_dispatch.sandbox_inline_content`. Pass values to
+      # relax the sandbox of the content served inline:
+      #
+      #     class DocumentsController < ApplicationController
+      #       sandbox_inline_content "allow-scripts", only: :preview
+      #     end
+      #
+      # Pass `false` to remove the sandbox:
+      #
+      #     class DocumentsController < ApplicationController
+      #       sandbox_inline_content false, only: :preview
+      #     end
+      def sandbox_inline_content(sandbox = true, **options)
+        before_action(options) do
+          request.sandbox_inline_content = sandbox
+        end
+      end
     end
 
     private

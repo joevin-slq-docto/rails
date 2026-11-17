@@ -1,3 +1,21 @@
+*   Add `config.action_dispatch.sandbox_inline_content` to send
+    `Content-Security-Policy: sandbox` with responses whose
+    `Content-Disposition` is `inline`.
+
+    An HTML or SVG file served inline can no longer run scripts in the origin
+    of the application. Enabled by default with `load_defaults "8.2"`.
+
+    A controller can relax or remove the sandbox:
+
+    ```ruby
+    class DocumentsController < ApplicationController
+      sandbox_inline_content "allow-scripts", only: :preview
+      sandbox_inline_content false, only: :raw
+    end
+    ```
+
+    *Joévin Soulenq*
+
 *   Apply `config.action_dispatch.cookies_same_site_protection` to every session
     store.
 

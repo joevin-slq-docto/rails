@@ -208,6 +208,9 @@ class ContentSecurityPolicyTest < ActiveSupport::TestCase
     @policy.sandbox
     assert_match %r{sandbox}, @policy.build
 
+    @policy.sandbox true
+    assert_match %r{sandbox\z}, @policy.build
+
     @policy.sandbox "allow-scripts", "allow-modals"
     assert_match %r{sandbox allow-scripts allow-modals}, @policy.build
 
@@ -380,6 +383,71 @@ class ContentSecurityPolicyMiddlewareTest < ActiveSupport::TestCase
 
     assert_equal @default_csp, headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY_REPORT_ONLY]
   end
+
+  def test_does_not_sandbox_inline_content_by_default
+    assert_equal "default-src 'self'", content_security_policy_for("inline")
+  end
+
+  def test_sandboxes_inline_content_when_sandbox_inline_content_is_true
+    @env["action_dispatch.sandbox_inline_content"] = true
+
+    assert_equal "default-src 'self', sandbox", content_security_policy_for("inline")
+    assert_equal "default-src 'self', sandbox", content_security_policy_for('inline; filename="file.html"')
+  end
+
+  def test_sandbox_is_added_to_app_content_security_policy_when_sandbox_inline_content_is_true
+    @env["action_dispatch.sandbox_inline_content"] = true
+
+    assert_equal "#{@default_csp}, sandbox", content_security_policy_for("inline", { ActionDispatch::Constants::CONTENT_SECURITY_POLICY => @default_csp })
+  end
+
+  def test_sandbox_is_enforced_when_content_security_policy_is_report_only_or_missing
+    @env["action_dispatch.sandbox_inline_content"] = true
+
+    @env["action_dispatch.content_security_policy_report_only"] = true
+    assert_equal "sandbox", content_security_policy_for("inline")
+
+    @env["action_dispatch.content_security_policy"] = nil
+    assert_equal "sandbox", content_security_policy_for("inline")
+  end
+
+  def test_does_not_sandbox_attachment_when_sandbox_inline_content_is_true
+    @env["action_dispatch.sandbox_inline_content"] = true
+
+    assert_equal "default-src 'self'", content_security_policy_for("attachment")
+    assert_equal "default-src 'self'", content_security_policy_for(nil)
+  end
+
+  def test_relaxes_sandbox_of_inline_content
+    @env["action_dispatch.sandbox_inline_content"] = "allow-scripts"
+    assert_equal "default-src 'self', sandbox allow-scripts", content_security_policy_for("inline")
+
+    @env["action_dispatch.sandbox_inline_content"] = %w[allow-scripts allow-popups]
+    assert_equal "default-src 'self', sandbox allow-scripts allow-popups", content_security_policy_for("inline")
+  end
+
+  def test_does_not_sandbox_inline_content_when_sandbox_inline_content_is_false
+    @env["action_dispatch.sandbox_inline_content"] = false
+
+    assert_equal "default-src 'self'", content_security_policy_for("inline")
+  end
+
+  def test_does_not_sandbox_not_modified_when_sandbox_inline_content_is_true
+    @env["action_dispatch.sandbox_inline_content"] = true
+
+    assert_nil content_security_policy_for("inline", status: 304)
+  end
+
+  private
+    def content_security_policy_for(disposition, headers = {}, status: 200)
+      headers = headers.merge(ActionDispatch::Constants::CONTENT_DISPOSITION => disposition).compact
+      app = proc { [status, headers, []] }
+      _, headers, _ = Rack::Lint.new(
+        ActionDispatch::ContentSecurityPolicy::Middleware.new(Rack::Lint.new(app))
+      ).call(@env)
+
+      headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY]
+    end
 end
 
 class DefaultContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
@@ -493,9 +561,20 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
       p.frame_ancestors :none
     end
 
+    sandbox_inline_content "allow-scripts", only: :relaxed_sandbox
+
+    sandbox_inline_content false, only: :no_sandbox
+
     def index
       head :ok
     end
+
+    def sandbox
+      send_data "sandbox", disposition: :inline
+    end
+
+    alias_method :relaxed_sandbox, :sandbox
+    alias_method :no_sandbox, :sandbox
 
     def inline
       head :ok
@@ -547,6 +626,9 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
       get "/no-policy", to: "policy#no_policy"
       get "/api", to: "policy#api"
       get "/not-modified", to: "policy#not_modified"
+      get "/sandbox", to: "policy#sandbox"
+      get "/relaxed-sandbox", to: "policy#relaxed_sandbox"
+      get "/no-sandbox", to: "policy#no_sandbox"
     end
   end
 
@@ -564,6 +646,7 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
       env["action_dispatch.content_security_policy_nonce_generator"] = proc { "iyhD0Yc0W+c=" }
       env["action_dispatch.content_security_policy_report_only"] = false
       env["action_dispatch.show_exceptions"] = :none
+      env["action_dispatch.sandbox_inline_content"] = true
 
       @app.call(env)
     end
@@ -630,6 +713,21 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_nil response.headers["Content-Security-Policy"]
     assert_nil response.headers["Content-Security-Policy-Report-Only"]
+  end
+
+  def test_sandboxes_inline_content
+    get "/sandbox"
+    assert_policy "default-src 'self', sandbox"
+  end
+
+  def test_relaxes_sandbox_of_inline_content
+    get "/relaxed-sandbox"
+    assert_policy "default-src 'self', sandbox allow-scripts"
+  end
+
+  def test_removes_sandbox_of_inline_content
+    get "/no-sandbox"
+    assert_policy "default-src 'self'"
   end
 
   private

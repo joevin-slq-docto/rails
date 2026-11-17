@@ -33,6 +33,7 @@ module ActionDispatch
     config.action_dispatch.log_rescued_responses = true
     config.action_dispatch.debug_exception_log_level = :fatal
     config.action_dispatch.strict_freshness = false
+    config.action_dispatch.sandbox_inline_content = false
 
     config.action_dispatch.ignore_leading_brackets = nil
     config.action_dispatch.strict_query_string_separator = nil

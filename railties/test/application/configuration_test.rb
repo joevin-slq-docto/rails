@@ -3974,6 +3974,19 @@ module ApplicationTests
       assert_equal 308, Rails.application.config.action_dispatch.ssl_default_redirect_status
     end
 
+    test "Rails.application.config.action_dispatch.sandbox_inline_content is true by default for new applications" do
+      app "development"
+
+      assert_equal true, Rails.application.env_config["action_dispatch.sandbox_inline_content"]
+    end
+
+    test "Rails.application.config.action_dispatch.sandbox_inline_content is false by default for older applications" do
+      remove_from_config '.*config\.load_defaults.*\n'
+      app "development"
+
+      assert_equal false, Rails.application.env_config["action_dispatch.sandbox_inline_content"]
+    end
+
     test "Rails.application.config.action_dispatch.strict_freshness is false by default for older applications" do
       remove_from_config '.*config\.load_defaults.*\n'
       app "development"
