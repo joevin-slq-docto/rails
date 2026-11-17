@@ -2665,7 +2665,8 @@ defaults to `true`.
 
 Adds the `sandbox` directive to the `Content-Security-Policy` of responses
 whose `Content-Disposition` is `inline`, so that an HTML or SVG file cannot
-run scripts in the origin of the application.
+run scripts in the origin of the application. Set it to sandbox values, such
+as `"allow-scripts"` or `%w[allow-scripts allow-popups]`, to relax the sandbox.
 
 It has no effect on a report-only policy, or when the response already has a
 `Content-Security-Policy` header.

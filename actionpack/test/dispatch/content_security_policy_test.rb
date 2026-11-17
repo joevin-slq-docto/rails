@@ -438,6 +438,14 @@ class ContentSecurityPolicyMiddlewareTest < ActiveSupport::TestCase
     assert_equal "default-src 'self'; sandbox", content_security_policy_for("Inline")
   end
 
+  def test_relaxes_sandbox_of_inline_content_with_sandbox_inline_content_values
+    @env["action_dispatch.sandbox_inline_content"] = "allow-scripts"
+    assert_equal "default-src 'self'; sandbox allow-scripts", content_security_policy_for("inline")
+
+    @env["action_dispatch.sandbox_inline_content"] = %w[allow-scripts allow-popups]
+    assert_equal "default-src 'self'; sandbox allow-scripts allow-popups", content_security_policy_for("inline")
+  end
+
   def test_sandboxes_inline_content_without_content_security_policy
     @env["action_dispatch.sandbox_inline_content"] = true
     @env["action_dispatch.content_security_policy"] = nil

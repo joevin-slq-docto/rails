@@ -349,6 +349,7 @@ module ActionDispatch # :nodoc:
       sandbox = @sandbox_inline_content.nil? ? sandbox_by_default : @sandbox_inline_content
       return self unless sandbox
 
+      sandbox = Array(sandbox) unless sandbox == true
       clone.tap { |policy| policy.directives["sandbox"] = sandbox }
     end
 
