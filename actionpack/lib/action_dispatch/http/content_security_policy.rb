@@ -43,7 +43,7 @@ module ActionDispatch # :nodoc:
 
         request = ActionDispatch::Request.new env
         policy = request.content_security_policy
-        policy = inline_content_policy(request, policy) if inline_content?(request, headers)
+        policy = inline_content_policy(request, policy) if sandbox_inline_content?(request, headers)
 
         if policy
           nonce = request.content_security_policy_nonce
@@ -57,7 +57,7 @@ module ActionDispatch # :nodoc:
       end
 
       private
-        def inline_content?(request, headers)
+        def sandbox_inline_content?(request, headers)
           # Browsers ignore `sandbox` in a report-only policy.
           return false if request.content_security_policy_report_only
 
