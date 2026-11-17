@@ -47,7 +47,8 @@ module ActionDispatch # :nodoc:
           nonce = request.content_security_policy_nonce
           nonce_directives = request.content_security_policy_nonce_directives
           context = request.controller_instance || request
-          headers[header_name(request)] = policy.build(context, nonce, nonce_directives)
+          name = header_name(request)
+          headers[name] = [policy.build(context, nonce, nonce_directives), headers[name]].compact.join(", ")
         end
 
         response
@@ -62,8 +63,12 @@ module ActionDispatch # :nodoc:
           end
         end
 
+        # A lone `sandbox` is set by `send_file`, `send_data` or `send_stream`, not
+        # by the application: its policy still applies.
         def policy_present?(headers)
-          headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY] ||
+          policy = headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY]
+
+          (policy && policy != "sandbox") ||
             headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY_REPORT_ONLY]
         end
     end

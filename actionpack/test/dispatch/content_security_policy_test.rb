@@ -380,6 +380,37 @@ class ContentSecurityPolicyMiddlewareTest < ActiveSupport::TestCase
 
     assert_equal @default_csp, headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY_REPORT_ONLY]
   end
+
+  def test_adds_content_security_policy_to_sandbox
+    headers = call_with_sandbox
+
+    assert_equal "default-src 'self', sandbox", headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY]
+  end
+
+  def test_adds_content_security_policy_report_only_to_sandbox
+    @env["action_dispatch.content_security_policy_report_only"] = true
+    headers = call_with_sandbox
+
+    assert_equal "sandbox", headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY]
+    assert_equal "default-src 'self'", headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY_REPORT_ONLY]
+  end
+
+  def test_keeps_sandbox_without_content_security_policy
+    @env["action_dispatch.content_security_policy"] = nil
+    headers = call_with_sandbox
+
+    assert_equal "sandbox", headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY]
+  end
+
+  private
+    def call_with_sandbox
+      app = proc { [200, { ActionDispatch::Constants::CONTENT_SECURITY_POLICY => "sandbox" }, []] }
+      _, headers, _ = Rack::Lint.new(
+        ActionDispatch::ContentSecurityPolicy::Middleware.new(Rack::Lint.new(app))
+      ).call(@env)
+
+      headers
+    end
 end
 
 class DefaultContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
@@ -525,6 +556,11 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
       render json: {}
     end
 
+    def send_inline
+      response.headers["Content-Security-Policy"] = params[:policy] if params[:policy]
+      send_data "inline", disposition: :inline
+    end
+
     def not_modified
       head :not_modified
     end
@@ -547,6 +583,7 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
       get "/no-policy", to: "policy#no_policy"
       get "/api", to: "policy#api"
       get "/not-modified", to: "policy#not_modified"
+      get "/send-inline", to: "policy#send_inline"
     end
   end
 
@@ -583,6 +620,16 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
   def test_generates_content_security_policy_header
     get "/"
     assert_policy "default-src 'self'"
+  end
+
+  def test_adds_content_security_policy_to_sandboxed_inline_content
+    get "/send-inline", env: { "action_dispatch.sandbox_inline_content" => true }
+    assert_policy "default-src 'self', sandbox"
+  end
+
+  def test_does_not_override_app_content_security_policy_of_sandboxed_inline_content
+    get "/send-inline", params: { policy: "default-src 'none'" }, env: { "action_dispatch.sandbox_inline_content" => true }
+    assert_policy "default-src 'none', sandbox"
   end
 
   def test_generates_inline_content_security_policy
