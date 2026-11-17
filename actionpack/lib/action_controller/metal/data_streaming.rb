@@ -145,6 +145,7 @@ module ActionController # :nodoc:
         if disposition
           headers["Content-Disposition"] = ActionDispatch::Http::ContentDisposition.format(disposition: disposition, filename: options[:filename])
         end
+        response.sandbox_inline_content!
 
         headers["Content-Transfer-Encoding"] = "binary"
       end

@@ -417,6 +417,25 @@ module ActionController
       assert_match "export", @response.headers["Content-Disposition"]
     end
 
+    def test_send_stream_does_not_sandbox_inline_content_by_default
+      get :send_stream_with_options
+      assert_nil @response.headers["Content-Security-Policy"]
+    end
+
+    def test_send_stream_sandboxes_inline_content_when_sandbox_inline_content_is_true
+      @request.set_header "action_dispatch.sandbox_inline_content", true
+
+      get :send_stream_with_options
+      assert_equal "sandbox", @response.headers["Content-Security-Policy"]
+    end
+
+    def test_send_stream_does_not_sandbox_attachment_when_sandbox_inline_content_is_true
+      @request.set_header "action_dispatch.sandbox_inline_content", true
+
+      get :basic_send_stream
+      assert_nil @response.headers["Content-Security-Policy"]
+    end
+
     def test_send_stream_with_explicit_content_type
       get :send_stream_with_explicit_content_type
 

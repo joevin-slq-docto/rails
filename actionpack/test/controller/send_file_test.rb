@@ -72,6 +72,11 @@ class SendFileController < ActionController::Base
   def data
     send_data(file_data, options)
   end
+
+  def data_with_content_security_policy
+    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    send_data(file_data, options)
+  end
 end
 
 class SendFileWithActionControllerLive < SendFileController
@@ -196,6 +201,45 @@ class SendFileTest < ActionController::TestCase
     @controller.options = { disposition: nil }
     process("data")
     assert_nil @controller.headers["Content-Disposition"]
+  end
+
+  def test_inline_content_is_not_sandboxed_by_default
+    @controller.options = { disposition: :inline }
+
+    %w(file data).each do |action|
+      process(action)
+      assert_nil response.headers["Content-Security-Policy"]
+    end
+  end
+
+  def test_inline_content_is_sandboxed_when_sandbox_inline_content_is_true
+    @request.set_header "action_dispatch.sandbox_inline_content", true
+
+    [:inline, "inline", nil].each do |disposition|
+      @controller.options = { disposition: disposition }
+
+      %w(file data).each do |action|
+        process(action)
+        assert_equal "sandbox", response.headers["Content-Security-Policy"]
+      end
+    end
+  end
+
+  def test_attachment_is_not_sandboxed_when_sandbox_inline_content_is_true
+    @request.set_header "action_dispatch.sandbox_inline_content", true
+
+    %w(file data).each do |action|
+      process(action)
+      assert_nil response.headers["Content-Security-Policy"]
+    end
+  end
+
+  def test_sandbox_overrides_content_security_policy_when_sandbox_inline_content_is_true
+    @request.set_header "action_dispatch.sandbox_inline_content", true
+    @controller.options = { disposition: :inline }
+
+    process("data_with_content_security_policy")
+    assert_equal "sandbox", response.headers["Content-Security-Policy"]
   end
 
   def test_send_file_from_before_action

@@ -402,6 +402,7 @@ module ActionController
 
         response.headers["Content-Disposition"] =
           ActionDispatch::Http::ContentDisposition.format(disposition: disposition, filename: filename)
+        response.sandbox_inline_content!
 
         yield response.stream
       end

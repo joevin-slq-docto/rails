@@ -427,6 +427,13 @@ module ActionDispatch # :nodoc:
       @stream = FileBody.new(path)
     end
 
+    def sandbox_inline_content! # :nodoc:
+      return unless request.get_header("action_dispatch.sandbox_inline_content")
+      return if get_header("Content-Disposition").to_s.start_with?("attachment")
+
+      set_header "Content-Security-Policy", "sandbox"
+    end
+
     def reset_body!
       @stream = build_buffer(self, [])
     end
