@@ -474,15 +474,6 @@ class ContentSecurityPolicyMiddlewareTest < ActiveSupport::TestCase
     assert_equal "default-src 'self'", content_security_policy_for("inline")
   end
 
-  def test_does_not_send_empty_content_security_policy_when_policy_only_disables_sandbox
-    @env["action_dispatch.sandbox_inline_content"] = true
-    @env["action_dispatch.content_security_policy"] = ActionDispatch::ContentSecurityPolicy.new do |p|
-      p.sandbox_inline_content false
-    end
-
-    assert_nil content_security_policy_for("inline")
-  end
-
   def test_sandbox_inline_content_takes_precedence_over_sandbox_of_content_security_policy
     @env["action_dispatch.sandbox_inline_content"] = true
     @env["action_dispatch.content_security_policy"] = ActionDispatch::ContentSecurityPolicy.new do |p|

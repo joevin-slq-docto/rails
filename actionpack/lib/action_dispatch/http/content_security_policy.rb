@@ -49,8 +49,7 @@ module ActionDispatch # :nodoc:
           nonce = request.content_security_policy_nonce
           nonce_directives = request.content_security_policy_nonce_directives
           context = request.controller_instance || request
-          header = policy.build(context, nonce, nonce_directives)
-          headers[header_name(request)] = header unless header.empty?
+          headers[header_name(request)] = policy.build(context, nonce, nonce_directives)
         end
 
         response
