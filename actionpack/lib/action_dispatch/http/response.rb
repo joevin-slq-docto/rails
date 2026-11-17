@@ -427,7 +427,8 @@ module ActionDispatch # :nodoc:
       @stream = FileBody.new(path)
     end
 
-    def sandbox_inline_content! # :nodoc:
+    # Sandbox the response unless it is sent as an attachment.
+    def sandbox_inline_content!
       return unless request.get_header("action_dispatch.sandbox_inline_content")
       return if get_header("Content-Disposition").to_s.start_with?("attachment")
 
