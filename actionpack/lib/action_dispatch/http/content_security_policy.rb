@@ -313,7 +313,7 @@ module ActionDispatch # :nodoc:
     # called, `config.action_dispatch.sandbox_inline_content` decides whether the
     # content served inline is sandboxed.
     def sandbox_inline_content(*values)
-      if values.empty?
+      if values.empty? || values.first == true
         @sandbox_inline_content = true
       elsif values.first
         @sandbox_inline_content = values

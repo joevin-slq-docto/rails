@@ -226,6 +226,9 @@ class ContentSecurityPolicyTest < ActiveSupport::TestCase
     @policy.sandbox_inline_content "allow-scripts", "allow-modals"
     assert_equal "default-src 'self'; sandbox allow-scripts allow-modals", @policy.for_inline_content.build
 
+    @policy.sandbox_inline_content true
+    assert_equal "default-src 'self'; sandbox", @policy.for_inline_content.build
+
     @policy.sandbox_inline_content false
     assert_equal "default-src 'self'", @policy.for_inline_content(true).build
   end
