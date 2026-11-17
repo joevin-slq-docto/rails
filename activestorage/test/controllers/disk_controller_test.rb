@@ -14,6 +14,16 @@ class ActiveStorage::DiskControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Hello world!", response.body
   end
 
+  test "showing blob inline is sandboxed" do
+    blob = create_blob(filename: "hello.jpg", content_type: "image/jpeg")
+
+    get blob.url
+    assert_equal "sandbox", response.headers["Content-Security-Policy"]
+
+    get blob.url(disposition: :attachment)
+    assert_nil response.headers["Content-Security-Policy"]
+  end
+
   test "showing blob as attachment" do
     blob = create_blob
     get blob.url(disposition: :attachment)

@@ -701,11 +701,24 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
       end
   end
 
+  class StreamController < ActionController::Base
+    include ActionController::Live
+
+    content_security_policy do |p|
+      p.sandbox_inline_content "allow-scripts"
+    end
+
+    def stream
+      send_stream(filename: "file.html", disposition: params[:disposition]) { |stream| stream.write "stream" }
+    end
+  end
+
   ROUTES = ActionDispatch::Routing::RouteSet.new
   ROUTES.draw do
     scope module: "content_security_policy_integration_test" do
       get "/", to: "policy#index"
       get "/data", to: "policy#data"
+      get "/stream", to: "stream#stream"
       get "/file", to: "policy#file"
       get "/page", to: "policy#page"
       get "/inline", to: "policy#inline"
@@ -771,6 +784,14 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
     assert_policy "default-src 'self'; sandbox allow-scripts"
 
     get "/file", params: { disposition: "attachment" }
+    assert_policy "default-src 'self'"
+  end
+
+  def test_sandboxes_inline_send_stream_with_sandbox_inline_content
+    get "/stream", params: { disposition: "inline" }
+    assert_policy "default-src 'self'; sandbox allow-scripts"
+
+    get "/stream", params: { disposition: "attachment" }
     assert_policy "default-src 'self'"
   end
 
