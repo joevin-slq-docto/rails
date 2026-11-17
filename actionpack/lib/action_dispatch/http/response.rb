@@ -432,7 +432,7 @@ module ActionDispatch # :nodoc:
       return unless request.get_header("action_dispatch.sandbox_inline_content")
       return if get_header("Content-Disposition").to_s.start_with?("attachment")
 
-      # "," not ";": a second policy that the first cannot weaken.
+      # Joined with "," as a separate policy to tighten the existing one.
       set_header "Content-Security-Policy", [get_header("Content-Security-Policy"), "sandbox"].compact.join(", ")
     end
 
