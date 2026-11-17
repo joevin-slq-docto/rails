@@ -577,6 +577,10 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
     alias_method :relaxed_sandbox, :sandbox
     alias_method :no_sandbox, :sandbox
 
+    def sandbox_file
+      send_file __FILE__, disposition: :inline
+    end
+
     def inline
       head :ok
     end
@@ -615,6 +619,14 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
       end
   end
 
+  class StreamController < ActionController::Base
+    include ActionController::Live
+
+    def sandbox
+      send_stream(filename: "file.html", disposition: :inline) { |stream| stream.write "sandbox" }
+    end
+  end
+
   ROUTES = ActionDispatch::Routing::RouteSet.new
   ROUTES.draw do
     scope module: "content_security_policy_integration_test" do
@@ -630,6 +642,8 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
       get "/sandbox", to: "policy#sandbox"
       get "/relaxed-sandbox", to: "policy#relaxed_sandbox"
       get "/no-sandbox", to: "policy#no_sandbox"
+      get "/sandbox-file", to: "policy#sandbox_file"
+      get "/sandbox-stream", to: "stream#sandbox"
     end
   end
 
@@ -718,6 +732,16 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
 
   def test_sandboxes_inline_content
     get "/sandbox"
+    assert_policy "default-src 'self', sandbox"
+  end
+
+  def test_sandboxes_inline_send_file
+    get "/sandbox-file"
+    assert_policy "default-src 'self', sandbox"
+  end
+
+  def test_sandboxes_inline_send_stream
+    get "/sandbox-stream"
     assert_policy "default-src 'self', sandbox"
   end
 
