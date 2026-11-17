@@ -432,7 +432,7 @@ module ActionDispatch # :nodoc:
       return unless request.get_header("action_dispatch.sandbox_inline_content")
       return if get_header("Content-Disposition").to_s.start_with?("attachment")
 
-      # Policies separated by a comma are all enforced.
+      # A comma starts a second policy: the browser enforces both.
       set_header "Content-Security-Policy", [get_header("Content-Security-Policy"), "sandbox"].compact.join(", ")
     end
 
