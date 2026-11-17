@@ -2667,6 +2667,9 @@ Sends `Content-Security-Policy: sandbox` with content served inline by
 `send_file`, `send_data` and `send_stream`, so that an HTML or SVG file cannot
 run scripts in the origin of the application. Attachments are not affected.
 
+It is enforced in addition to a `Content-Security-Policy` set by the action.
+The application-wide policy is not sent with these responses.
+
 The default value depends on the `config.load_defaults` target version:
 
 | Starting with version | The default value is |

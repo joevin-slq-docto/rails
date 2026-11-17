@@ -432,7 +432,8 @@ module ActionDispatch # :nodoc:
       return unless request.get_header("action_dispatch.sandbox_inline_content")
       return if get_header("Content-Disposition").to_s.start_with?("attachment")
 
-      set_header "Content-Security-Policy", "sandbox"
+      # Policies separated by a comma are all enforced.
+      set_header "Content-Security-Policy", [get_header("Content-Security-Policy"), "sandbox"].compact.join(", ")
     end
 
     def reset_body!

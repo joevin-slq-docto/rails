@@ -234,12 +234,12 @@ class SendFileTest < ActionController::TestCase
     end
   end
 
-  def test_sandbox_overrides_content_security_policy_when_sandbox_inline_content_is_true
+  def test_sandbox_is_added_to_content_security_policy_when_sandbox_inline_content_is_true
     @request.set_header "action_dispatch.sandbox_inline_content", true
     @controller.options = { disposition: :inline }
 
     process("data_with_content_security_policy")
-    assert_equal "sandbox", response.headers["Content-Security-Policy"]
+    assert_equal "default-src 'self', sandbox", response.headers["Content-Security-Policy"]
   end
 
   def test_send_file_from_before_action
