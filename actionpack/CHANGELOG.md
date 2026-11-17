@@ -1,3 +1,14 @@
+*   Add `config.action_controller.sandbox_inline_files` to sandbox inline file
+    responses.
+
+    When enabled, responses sent with `send_file`, `send_data` or `send_stream`
+    that the browser renders in the page (any disposition other than
+    `attachment`) get an enforced `Content-Security-Policy: sandbox`, whatever
+    their content type. The sandbox is kept next to the application's own
+    policy, including when that policy is report-only.
+
+    *Joévin Soulenq*
+
 *   Apply `config.action_dispatch.cookies_same_site_protection` to every session
     store.
 

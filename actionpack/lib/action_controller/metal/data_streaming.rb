@@ -16,6 +16,19 @@ module ActionController # :nodoc:
     DEFAULT_SEND_FILE_TYPE        = "application/octet-stream" # :nodoc:
     DEFAULT_SEND_FILE_DISPOSITION = "attachment" # :nodoc:
 
+    included do
+      # When enabled, responses sent with `send_file`, `send_data` or `send_stream`
+      # that the browser renders in the page (any disposition other than
+      # `attachment`, including none) are sandboxed with an enforced
+      # `Content-Security-Policy: sandbox`, whatever their content type. A file
+      # served this way cannot run script in the application's origin, even when
+      # its content type was chosen by whoever uploaded it.
+      #
+      # The sandbox is added by `ActionDispatch::ContentSecurityPolicy::Middleware`
+      # and kept alongside the application's own policy, report-only or not.
+      mattr_accessor :sandbox_inline_files, default: false
+    end
+
     private
       # Sends the file. This uses a server-appropriate method (such as `X-Sendfile`)
       # via the `Rack::Sendfile` middleware. The header to use is set via
@@ -147,6 +160,15 @@ module ActionController # :nodoc:
         end
 
         headers["Content-Transfer-Encoding"] = "binary"
+
+        sandbox_inline_file_response
+      end
+
+      def sandbox_inline_file_response # :nodoc:
+        return unless sandbox_inline_files
+        return if headers["Content-Disposition"].to_s.match?(/\Aattachment\b/i)
+
+        request.content_security_policy_sandbox = true
       end
   end
 end

@@ -123,6 +123,20 @@
 # Rails.application.config.action_controller.rescue_from_event_backtrace = :array
 
 ###
+# Sandbox responses sent with `send_file`, `send_data` or `send_stream` that
+# the browser renders in the page (any disposition other than `attachment`)
+# with an enforced `Content-Security-Policy: sandbox`, whatever their content
+# type. An HTML or SVG file served inline then cannot run script in the
+# application's origin.
+#
+# The sandbox is added next to the application's own policy, report-only or
+# not. Before enabling, check that inline files your application serves in an
+# iframe, or that rely on script (such as some browser PDF viewers), still
+# render as expected.
+#++
+# Rails.application.config.action_controller.sandbox_inline_files = true
+
+###
 # Honor specific formats in the `Accept` header even when it contains the `*/*`
 # wildcard, instead of always defaulting to HTML. For example, a request with
 # `Accept: application/json, */*` now returns JSON.

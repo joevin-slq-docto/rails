@@ -64,6 +64,7 @@ Below are the default values associated with each target version. In cases of co
 - [`config.action_controller.default_protect_from_forgery_with`](#config-action-controller-default-protect-from-forgery-with): `:exception`
 - [`config.action_controller.forgery_protection_verification_strategy`](#config-action-controller-forgery-protection-verification-strategy): `:header_only`
 - [`config.action_controller.rescue_from_event_backtrace`](#config-action-controller-rescue-from-event-backtrace): `:array`
+- [`config.action_controller.sandbox_inline_files`](#config-action-controller-sandbox-inline-files): `true`
 - [`config.action_dispatch.default_headers`](#config-action-dispatch-default-headers): `{ "X-Frame-Options" => "SAMEORIGIN", "X-Content-Type-Options" => "nosniff", "X-Permitted-Cross-Domain-Policies" => "none", "Referrer-Policy" => "strict-origin-when-cross-origin" }`
 - [`config.action_dispatch.strict_accept_header`](#config-action-dispatch-strict-accept-header): `true`
 - [`config.action_view.erb_implementation`](#config-action-view-erb-implementation): `:herb`
@@ -2370,6 +2371,32 @@ The default value depends on the `config.load_defaults` target version:
 | --------------------- | -------------------- |
 | (original)            | `nil`                |
 | 8.2                   | `:array`             |
+
+#### `config.action_controller.sandbox_inline_files`
+
+When `true`, responses sent with `send_file`, `send_data` or `send_stream` that
+the browser renders in the page get an enforced `Content-Security-Policy: sandbox`
+header, whatever their content type. A response is rendered in the page unless
+its disposition is `attachment`: `disposition: "inline"` and `disposition: nil`
+(no `Content-Disposition` header) are both sandboxed.
+
+The sandbox is added by `ActionDispatch::ContentSecurityPolicy::Middleware`:
+
+* With an enforced policy, the `sandbox` directive is added to it, unless the
+  policy already sets one.
+* With a report-only policy, or without a policy, a separate
+  `Content-Security-Policy: sandbox` header is sent, since browsers ignore
+  `sandbox` in a report-only policy.
+
+The middleware is not part of the API-only middleware stack, so this option has
+no effect in API-only applications.
+
+The default value depends on the `config.load_defaults` target version:
+
+| Starting with version | The default value is |
+| --------------------- | -------------------- |
+| (original)            | `false`              |
+| 8.2                   | `true`               |
 
 ### Configuring Action Dispatch
 

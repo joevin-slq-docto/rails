@@ -42,12 +42,22 @@ module ActionDispatch # :nodoc:
         return response if policy_present?(headers)
 
         request = ActionDispatch::Request.new env
+        policy = request.content_security_policy
+        sandbox = request.content_security_policy_sandbox
+        report_only = request.content_security_policy_report_only
 
-        if policy = request.content_security_policy
+        if policy
+          policy = sandboxed(policy) if sandbox && !report_only
           nonce = request.content_security_policy_nonce
           nonce_directives = request.content_security_policy_nonce_directives
           context = request.controller_instance || request
           headers[header_name(request)] = policy.build(context, nonce, nonce_directives)
+        end
+
+        # Browsers ignore `sandbox` in a report-only policy, so it is enforced through
+        # its own header whenever the response has no enforced policy to carry it.
+        if sandbox && (policy.nil? || report_only)
+          headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY] = "sandbox"
         end
 
         response
@@ -62,6 +72,12 @@ module ActionDispatch # :nodoc:
           end
         end
 
+        def sandboxed(policy)
+          return policy if policy.directives.key?("sandbox")
+
+          policy.clone.tap(&:sandbox)
+        end
+
         def policy_present?(headers)
           headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY] ||
             headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY_REPORT_ONLY]
@@ -74,6 +90,7 @@ module ActionDispatch # :nodoc:
       NONCE_GENERATOR = "action_dispatch.content_security_policy_nonce_generator"
       NONCE = "action_dispatch.content_security_policy_nonce"
       NONCE_DIRECTIVES = "action_dispatch.content_security_policy_nonce_directives"
+      SANDBOX = "action_dispatch.content_security_policy_sandbox"
 
       def content_security_policy
         get_header(POLICY)
@@ -93,6 +110,18 @@ module ActionDispatch # :nodoc:
 
       def content_security_policy_nonce_generator
         get_header(NONCE_GENERATOR)
+      end
+
+      # Whether the response must be sandboxed with an enforced
+      # `Content-Security-Policy: sandbox`, whatever the policy's report-only mode.
+      # Set by `send_file`, `send_data` and `send_stream` for inline responses when
+      # `config.action_controller.sandbox_inline_files` is enabled.
+      def content_security_policy_sandbox
+        get_header(SANDBOX)
+      end
+
+      def content_security_policy_sandbox=(value)
+        set_header(SANDBOX, value)
       end
 
       def content_security_policy_nonce_generator=(generator)

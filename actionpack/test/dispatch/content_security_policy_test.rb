@@ -380,6 +380,175 @@ class ContentSecurityPolicyMiddlewareTest < ActiveSupport::TestCase
 
     assert_equal @default_csp, headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY_REPORT_ONLY]
   end
+
+  def test_adds_sandbox_to_an_enforced_policy
+    @env["action_dispatch.content_security_policy_sandbox"] = true
+    headers = call_middleware
+
+    assert_equal "default-src 'self'; sandbox", headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY]
+    assert_nil headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY_REPORT_ONLY]
+  end
+
+  def test_enforces_sandbox_next_to_a_report_only_policy
+    @env["action_dispatch.content_security_policy_sandbox"] = true
+    @env["action_dispatch.content_security_policy_report_only"] = true
+    headers = call_middleware
+
+    assert_equal "sandbox", headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY]
+    assert_equal "default-src 'self'", headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY_REPORT_ONLY]
+  end
+
+  def test_enforces_sandbox_without_a_policy
+    @env["action_dispatch.content_security_policy_sandbox"] = true
+    @env["action_dispatch.content_security_policy"] = nil
+    headers = call_middleware
+
+    assert_equal "sandbox", headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY]
+    assert_nil headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY_REPORT_ONLY]
+  end
+
+  def test_keeps_the_sandbox_directive_of_the_policy
+    @env["action_dispatch.content_security_policy_sandbox"] = true
+    @env["action_dispatch.content_security_policy"].sandbox "allow-downloads"
+    headers = call_middleware
+
+    assert_equal "default-src 'self'; sandbox allow-downloads", headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY]
+  end
+
+  def test_does_not_add_sandbox_to_the_configured_policy
+    policy = @env["action_dispatch.content_security_policy"]
+    @env["action_dispatch.content_security_policy_sandbox"] = true
+    call_middleware
+
+    assert_not policy.directives.key?("sandbox")
+  end
+
+  def test_does_not_override_app_content_security_policy_to_sandbox
+    @env["action_dispatch.content_security_policy_sandbox"] = true
+    headers = call_middleware(ActionDispatch::Constants::CONTENT_SECURITY_POLICY => @default_csp)
+
+    assert_equal @default_csp, headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY]
+  end
+
+  private
+    def call_middleware(app_headers = {})
+      app = proc { [200, app_headers, []] }
+      _, headers, _ = Rack::Lint.new(
+        ActionDispatch::ContentSecurityPolicy::Middleware.new(Rack::Lint.new(app))
+      ).call(@env)
+      headers
+    end
+end
+
+class SandboxInlineFilesIntegrationTest < ActionDispatch::IntegrationTest
+  PAYLOAD = "<script>alert(document.domain)</script>"
+
+  class FilesController < ActionController::Base
+    def inline_data
+      send_data PAYLOAD, type: "text/html", disposition: "inline"
+    end
+
+    def attached_data
+      send_data PAYLOAD, type: "text/html", disposition: "attachment"
+    end
+
+    def undisposed_data
+      send_data PAYLOAD, type: "text/html", disposition: nil
+    end
+
+    def inline_file
+      send_file __FILE__, type: "text/plain", disposition: "inline"
+    end
+
+    def attached_file
+      send_file __FILE__, type: "text/plain"
+    end
+  end
+
+  class StreamsController < ActionController::Base
+    include ActionController::Live
+
+    def inline_stream
+      send_stream(filename: "payload.html", disposition: "inline") { |stream| stream.write PAYLOAD }
+    end
+
+    def attached_stream
+      send_stream(filename: "payload.html") { |stream| stream.write PAYLOAD }
+    end
+  end
+
+  ROUTES = ActionDispatch::Routing::RouteSet.new
+  ROUTES.draw do
+    scope module: "sandbox_inline_files_integration_test" do
+      %w[inline_data attached_data undisposed_data inline_file attached_file].each do |action|
+        get "/files/#{action}", to: "files##{action}"
+      end
+      %w[inline_stream attached_stream].each do |action|
+        get "/streams/#{action}", to: "streams##{action}"
+      end
+    end
+  end
+
+  class PolicyConfigMiddleware
+    def initialize(app)
+      @app = app
+    end
+
+    def call(env)
+      env["action_dispatch.content_security_policy"] = ActionDispatch::ContentSecurityPolicy.new { |p| p.default_src :self }
+      env["action_dispatch.content_security_policy_nonce_generator"] = nil
+      env["action_dispatch.content_security_policy_report_only"] = false
+      env["action_dispatch.show_exceptions"] = :none
+
+      @app.call(env)
+    end
+  end
+
+  APP = build_app(ROUTES) do |middleware|
+    middleware.use Rack::Lint
+    middleware.use PolicyConfigMiddleware
+    middleware.use ActionDispatch::ContentSecurityPolicy::Middleware
+    middleware.use Rack::Lint
+  end
+
+  def app
+    APP
+  end
+
+  setup do
+    @sandbox_inline_files = ActionController::Base.sandbox_inline_files
+    ActionController::Base.sandbox_inline_files = true
+  end
+
+  teardown do
+    ActionController::Base.sandbox_inline_files = @sandbox_inline_files
+  end
+
+  def test_sandboxes_inline_responses
+    %w[/files/inline_data /files/undisposed_data /files/inline_file /streams/inline_stream].each do |path|
+      get path
+
+      assert_response :success
+      assert_equal "default-src 'self'; sandbox", response.headers["Content-Security-Policy"], path
+    end
+  end
+
+  def test_does_not_sandbox_attachments
+    %w[/files/attached_data /files/attached_file /streams/attached_stream].each do |path|
+      get path
+
+      assert_response :success
+      assert_equal "default-src 'self'", response.headers["Content-Security-Policy"], path
+    end
+  end
+
+  def test_does_not_sandbox_inline_responses_when_disabled
+    ActionController::Base.sandbox_inline_files = false
+
+    get "/files/inline_data"
+
+    assert_equal "default-src 'self'", response.headers["Content-Security-Policy"]
+  end
 end
 
 class DefaultContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
