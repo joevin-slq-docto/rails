@@ -55,11 +55,11 @@ module ActionDispatch # :nodoc:
 
       private
         def sandbox_inline_content(request, headers)
-          return unless sandbox = request.sandbox_inline_content
+          return unless values = request.sandbox_inline_content
           return unless headers[ActionDispatch::Constants::CONTENT_DISPOSITION]&.match?(/\Ainline\b/i)
 
           name = ActionDispatch::Constants::CONTENT_SECURITY_POLICY
-          sandbox = ContentSecurityPolicy.new { |policy| policy.sandbox(*sandbox) }.build
+          sandbox = ContentSecurityPolicy.new { |policy| policy.sandbox(*values) }.build
           # Joined with "," as a separate policy to tighten the existing one.
           headers[name] = [headers[name], sandbox].compact.join(", ")
         end
