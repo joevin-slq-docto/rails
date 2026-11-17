@@ -56,7 +56,7 @@ module ActionDispatch # :nodoc:
       private
         def sandbox_inline_content(request, headers)
           return unless sandbox = request.sandbox_inline_content
-          return unless headers[ActionDispatch::Constants::CONTENT_DISPOSITION]&.start_with?("inline")
+          return unless headers[ActionDispatch::Constants::CONTENT_DISPOSITION]&.match?(/\Ainline\b/i)
 
           name = ActionDispatch::Constants::CONTENT_SECURITY_POLICY
           sandbox = ContentSecurityPolicy.new { |policy| policy.sandbox(*sandbox) }.build
