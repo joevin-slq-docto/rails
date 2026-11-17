@@ -129,6 +129,14 @@
 #++
 # Rails.application.config.action_dispatch.strict_accept_header = true
 
+###
+# Add the `sandbox` directive to the `Content-Security-Policy` of responses
+# whose `Content-Disposition` is `inline`, so that an HTML or SVG file cannot
+# run scripts in the origin of the application. Use
+# `policy.sandbox_inline_content` to relax it.
+#++
+# Rails.application.config.action_dispatch.sandbox_inline_content = true
+
 # Raise `ArgumentError` on `ActiveSupport::TimeZone#parse` for any invalid
 # string.
 #

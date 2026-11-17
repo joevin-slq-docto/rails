@@ -42,8 +42,10 @@ module ActionDispatch # :nodoc:
         return response if policy_present?(headers)
 
         request = ActionDispatch::Request.new env
+        policy = request.content_security_policy
+        policy = inline_content_policy(request, policy) if inline_content?(request, headers)
 
-        if policy = request.content_security_policy
+        if policy
           nonce = request.content_security_policy_nonce
           nonce_directives = request.content_security_policy_nonce_directives
           context = request.controller_instance || request
@@ -54,6 +56,19 @@ module ActionDispatch # :nodoc:
       end
 
       private
+        def inline_content?(request, headers)
+          # Browsers ignore `sandbox` in a report-only policy.
+          return false if request.content_security_policy_report_only
+
+          headers[ActionDispatch::Constants::CONTENT_DISPOSITION]&.start_with?("inline")
+        end
+
+        def inline_content_policy(request, policy)
+          sandbox = request.get_header("action_dispatch.sandbox_inline_content")
+          policy ||= ContentSecurityPolicy.new if sandbox
+          policy&.for_inline_content(sandbox)
+        end
+
         def header_name(request)
           if request.content_security_policy_report_only
             ActionDispatch::Constants::CONTENT_SECURITY_POLICY_REPORT_ONLY
@@ -179,6 +194,7 @@ module ActionDispatch # :nodoc:
 
     def initialize
       @directives = {}
+      @sandbox_inline_content = nil
       yield self if block_given?
     end
 
@@ -278,6 +294,34 @@ module ActionDispatch # :nodoc:
       end
     end
 
+    # Specify the [sandbox](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/sandbox)
+    # of the content served inline, that is the responses whose
+    # `Content-Disposition` is `inline`. The policy of the other responses is left
+    # alone:
+    #
+    #     policy.sandbox_inline_content
+    #
+    # Values can be passed as arguments:
+    #
+    #     policy.sandbox_inline_content "allow-scripts", "allow-modals"
+    #
+    # Pass `false` to disable the sandbox:
+    #
+    #     policy.sandbox_inline_content false
+    #
+    # For these responses, it takes precedence over #sandbox. When it is not
+    # called, `config.action_dispatch.sandbox_inline_content` decides whether the
+    # content served inline is sandboxed.
+    def sandbox_inline_content(*values)
+      if values.empty?
+        @sandbox_inline_content = true
+      elsif values.first
+        @sandbox_inline_content = values
+      else
+        @sandbox_inline_content = false
+      end
+    end
+
     # Specify whether user agents should treat any assets over HTTP as HTTPS:
     #
     #     policy.upgrade_insecure_requests
@@ -297,6 +341,15 @@ module ActionDispatch # :nodoc:
     def build(context = nil, nonce = nil, nonce_directives = nil)
       nonce_directives = DEFAULT_NONCE_DIRECTIVES if nonce_directives.nil?
       build_directives(context, nonce, nonce_directives).compact.join("; ")
+    end
+
+    # Returns the policy of the content served inline: this policy with the
+    # `sandbox` directive of #sandbox_inline_content.
+    def for_inline_content(sandbox_by_default = false) # :nodoc:
+      sandbox = @sandbox_inline_content.nil? ? sandbox_by_default : @sandbox_inline_content
+      return self unless sandbox
+
+      clone.tap { |policy| policy.directives["sandbox"] = sandbox }
     end
 
     private

@@ -7,6 +7,7 @@ module ActionDispatch
     # Response Header keys for Rack 2.x and 3.x
     if Gem::Version.new(Rack::RELEASE) < Gem::Version.new("3")
       VARY = "Vary"
+      CONTENT_DISPOSITION = "Content-Disposition"
       CONTENT_ENCODING = "Content-Encoding"
       CONTENT_SECURITY_POLICY = "Content-Security-Policy"
       CONTENT_SECURITY_POLICY_REPORT_ONLY = "Content-Security-Policy-Report-Only"
@@ -18,6 +19,7 @@ module ActionDispatch
       STRICT_TRANSPORT_SECURITY = "Strict-Transport-Security"
     else
       VARY = "vary"
+      CONTENT_DISPOSITION = "content-disposition"
       CONTENT_ENCODING = "content-encoding"
       CONTENT_SECURITY_POLICY = "content-security-policy"
       CONTENT_SECURITY_POLICY_REPORT_ONLY = "content-security-policy-report-only"

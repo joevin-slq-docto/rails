@@ -348,6 +348,7 @@ module Rails
           "action_dispatch.content_security_policy_report_only" => config.content_security_policy_report_only,
           "action_dispatch.content_security_policy_nonce_generator" => config.content_security_policy_nonce_generator,
           "action_dispatch.content_security_policy_nonce_directives" => config.content_security_policy_nonce_directives,
+          "action_dispatch.sandbox_inline_content" => config.action_dispatch.sandbox_inline_content,
           "action_dispatch.permissions_policy" => config.permissions_policy,
         )
     end

@@ -1,3 +1,22 @@
+*   Add `ContentSecurityPolicy#sandbox_inline_content` to set the `sandbox`
+    directive of the content served inline, that is the responses whose
+    `Content-Disposition` is `inline`. The policy of the other responses is
+    left alone.
+
+    ```ruby
+    Rails.application.config.content_security_policy do |policy|
+      policy.default_src :self
+      policy.sandbox_inline_content "allow-scripts"
+    end
+    ```
+
+    `config.action_dispatch.sandbox_inline_content` sandboxes this content when
+    the policy does not say otherwise, so that an HTML or SVG file can no longer
+    run scripts in the origin of the application. Enabled by default with
+    `load_defaults "8.2"`.
+
+    *Joévin Soulenq*
+
 *   Apply `config.action_dispatch.cookies_same_site_protection` to every session
     store.
 
