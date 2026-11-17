@@ -39,21 +39,31 @@ module ActionDispatch # :nodoc:
         # new CSP headers might not match nonces in the cached HTML.
         return response if status == 304
 
-        return response if policy_present?(headers)
-
         request = ActionDispatch::Request.new env
 
-        if policy = request.content_security_policy
+        if !policy_present?(headers) && policy = request.content_security_policy
           nonce = request.content_security_policy_nonce
           nonce_directives = request.content_security_policy_nonce_directives
           context = request.controller_instance || request
           headers[header_name(request)] = policy.build(context, nonce, nonce_directives)
         end
 
+        sandbox_inline_content(request, headers)
+
         response
       end
 
       private
+        def sandbox_inline_content(request, headers)
+          return unless values = request.sandbox_inline_content
+          return unless headers[ActionDispatch::Constants::CONTENT_DISPOSITION]&.match?(/\Ainline\b/i)
+
+          name = ActionDispatch::Constants::CONTENT_SECURITY_POLICY
+          sandbox = ContentSecurityPolicy.new { |policy| policy.sandbox(*values) }.build
+          # Joined with "," as a separate policy to tighten the existing one.
+          headers[name] = [headers[name], sandbox].compact.join(", ")
+        end
+
         def header_name(request)
           if request.content_security_policy_report_only
             ActionDispatch::Constants::CONTENT_SECURITY_POLICY_REPORT_ONLY
@@ -74,6 +84,7 @@ module ActionDispatch # :nodoc:
       NONCE_GENERATOR = "action_dispatch.content_security_policy_nonce_generator"
       NONCE = "action_dispatch.content_security_policy_nonce"
       NONCE_DIRECTIVES = "action_dispatch.content_security_policy_nonce_directives"
+      SANDBOX_INLINE_CONTENT = "action_dispatch.sandbox_inline_content"
 
       def content_security_policy
         get_header(POLICY)
@@ -105,6 +116,14 @@ module ActionDispatch # :nodoc:
 
       def content_security_policy_nonce_directives=(generator)
         set_header(NONCE_DIRECTIVES, generator)
+      end
+
+      def sandbox_inline_content
+        get_header(SANDBOX_INLINE_CONTENT)
+      end
+
+      def sandbox_inline_content=(sandbox)
+        set_header(SANDBOX_INLINE_CONTENT, sandbox)
       end
 
       def content_security_policy_nonce
@@ -264,12 +283,12 @@ module ActionDispatch # :nodoc:
     #
     #     policy.sandbox "allow-scripts", "allow-modals"
     #
-    # Pass `false` to disable the sandbox:
+    # Pass `false` to disable the sandbox, or `true` to enable it:
     #
     #     policy.sandbox false
     #
     def sandbox(*values)
-      if values.empty?
+      if values.empty? || values.first == true
         @directives["sandbox"] = true
       elsif values.first
         @directives["sandbox"] = values
