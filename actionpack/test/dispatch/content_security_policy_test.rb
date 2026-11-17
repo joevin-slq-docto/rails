@@ -564,7 +564,7 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
 
     content_security_policy(false, only: :no_policy)
 
-    content_security_policy_report_only only: :report_only
+    content_security_policy_report_only only: [:report_only, :report_only_sandbox]
 
     content_security_policy only: :api do |p|
       p.default_src :none
@@ -585,6 +585,7 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
 
     alias_method :relaxed_sandbox, :sandbox
     alias_method :no_sandbox, :sandbox
+    alias_method :report_only_sandbox, :sandbox
 
     def sandbox_file
       send_file __FILE__, disposition: :inline
@@ -651,6 +652,7 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
       get "/sandbox", to: "policy#sandbox"
       get "/relaxed-sandbox", to: "policy#relaxed_sandbox"
       get "/no-sandbox", to: "policy#no_sandbox"
+      get "/report-only-sandbox", to: "policy#report_only_sandbox"
       get "/sandbox-file", to: "policy#sandbox_file"
       get "/sandbox-stream", to: "stream#sandbox"
     end
@@ -762,6 +764,13 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
   def test_removes_sandbox_of_inline_content
     get "/no-sandbox"
     assert_policy "default-src 'self'"
+  end
+
+  def test_sandboxes_inline_content_next_to_report_only_policy
+    get "/report-only-sandbox"
+    assert_response :success
+    assert_equal "sandbox", response.headers["Content-Security-Policy"]
+    assert_equal "default-src 'self'", response.headers["Content-Security-Policy-Report-Only"]
   end
 
   private
