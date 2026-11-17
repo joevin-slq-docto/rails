@@ -60,7 +60,7 @@ module ActionDispatch # :nodoc:
           # Browsers ignore `sandbox` in a report-only policy.
           return false if request.content_security_policy_report_only
 
-          headers[ActionDispatch::Constants::CONTENT_DISPOSITION]&.start_with?("inline")
+          headers[ActionDispatch::Constants::CONTENT_DISPOSITION]&.match?(/\Ainline\b/i)
         end
 
         def inline_content_policy(request, policy)

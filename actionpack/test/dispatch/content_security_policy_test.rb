@@ -432,6 +432,7 @@ class ContentSecurityPolicyMiddlewareTest < ActiveSupport::TestCase
 
     assert_equal "default-src 'self'; sandbox", content_security_policy_for("inline")
     assert_equal "default-src 'self'; sandbox", content_security_policy_for('inline; filename="file.html"')
+    assert_equal "default-src 'self'; sandbox", content_security_policy_for("Inline")
   end
 
   def test_sandboxes_inline_content_without_content_security_policy
