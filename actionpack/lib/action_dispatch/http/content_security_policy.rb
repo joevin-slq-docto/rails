@@ -283,7 +283,7 @@ module ActionDispatch # :nodoc:
     #
     #     policy.sandbox "allow-scripts", "allow-modals"
     #
-    # Pass `false` to disable the sandbox:
+    # Pass `false` to disable the sandbox, or `true` to enable it:
     #
     #     policy.sandbox false
     #
