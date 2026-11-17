@@ -215,6 +215,51 @@ class ContentSecurityPolicyTest < ActiveSupport::TestCase
     assert_no_match %r{sandbox}, @policy.build
   end
 
+  def test_sandbox_inline_content
+    @policy.default_src :self
+    assert_equal "default-src 'self'", @policy.for_inline_content.build
+    assert_equal "default-src 'self'; sandbox", @policy.for_inline_content(true).build
+
+    @policy.sandbox_inline_content
+    assert_equal "default-src 'self'; sandbox", @policy.for_inline_content.build
+
+    @policy.sandbox_inline_content "allow-scripts", "allow-modals"
+    assert_equal "default-src 'self'; sandbox allow-scripts allow-modals", @policy.for_inline_content.build
+
+    @policy.sandbox_inline_content true
+    assert_equal "default-src 'self'; sandbox", @policy.for_inline_content.build
+
+    @policy.sandbox_inline_content false
+    assert_equal "default-src 'self'", @policy.for_inline_content(true).build
+  end
+
+  def test_sandbox_inline_content_is_not_part_of_the_policy
+    @policy.default_src :self
+    @policy.sandbox_inline_content "allow-scripts"
+
+    assert_equal "default-src 'self'", @policy.build
+    @policy.for_inline_content.build
+    assert_equal "default-src 'self'", @policy.build
+  end
+
+  def test_sandbox_inline_content_takes_precedence_over_sandbox
+    @policy.sandbox "allow-scripts"
+    assert_equal "sandbox allow-scripts", @policy.for_inline_content.build
+
+    @policy.sandbox_inline_content "allow-downloads"
+    assert_equal "sandbox allow-scripts", @policy.build
+    assert_equal "sandbox allow-downloads", @policy.for_inline_content.build
+  end
+
+  def test_dup_keeps_sandbox_inline_content
+    @policy.sandbox_inline_content "allow-scripts"
+    copied = @policy.dup
+    copied.sandbox_inline_content false
+
+    assert_equal "sandbox allow-scripts", @policy.for_inline_content.build
+    assert_equal "", copied.for_inline_content(true).build
+  end
+
   def test_navigation_directives
     @policy.form_action :self
     assert_match %r{form-action 'self'}, @policy.build
@@ -380,6 +425,102 @@ class ContentSecurityPolicyMiddlewareTest < ActiveSupport::TestCase
 
     assert_equal @default_csp, headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY_REPORT_ONLY]
   end
+
+  def test_does_not_sandbox_inline_content_by_default
+    assert_equal "default-src 'self'", content_security_policy_for("inline")
+  end
+
+  def test_sandboxes_inline_content_when_sandbox_inline_content_is_true
+    @env["action_dispatch.sandbox_inline_content"] = true
+
+    assert_equal "default-src 'self'; sandbox", content_security_policy_for("inline")
+    assert_equal "default-src 'self'; sandbox", content_security_policy_for('inline; filename="file.html"')
+    assert_equal "default-src 'self'; sandbox", content_security_policy_for("Inline")
+  end
+
+  def test_relaxes_sandbox_of_inline_content_with_sandbox_inline_content_values
+    @env["action_dispatch.sandbox_inline_content"] = "allow-scripts"
+    assert_equal "default-src 'self'; sandbox allow-scripts", content_security_policy_for("inline")
+
+    @env["action_dispatch.sandbox_inline_content"] = %w[allow-scripts allow-popups]
+    assert_equal "default-src 'self'; sandbox allow-scripts allow-popups", content_security_policy_for("inline")
+  end
+
+  def test_sandboxes_inline_content_without_content_security_policy
+    @env["action_dispatch.sandbox_inline_content"] = true
+    @env["action_dispatch.content_security_policy"] = nil
+
+    assert_equal "sandbox", content_security_policy_for("inline")
+  end
+
+  def test_sandboxes_inline_content_with_sandbox_inline_content_of_content_security_policy
+    @env["action_dispatch.content_security_policy"] = ActionDispatch::ContentSecurityPolicy.new do |p|
+      p.default_src :self
+      p.sandbox_inline_content "allow-scripts"
+    end
+
+    assert_equal "default-src 'self'; sandbox allow-scripts", content_security_policy_for("inline")
+    assert_equal "default-src 'self'", content_security_policy_for("attachment")
+    assert_equal "default-src 'self'", content_security_policy_for(nil)
+  end
+
+  def test_does_not_sandbox_inline_content_when_content_security_policy_disables_it
+    @env["action_dispatch.sandbox_inline_content"] = true
+    @env["action_dispatch.content_security_policy"] = ActionDispatch::ContentSecurityPolicy.new do |p|
+      p.default_src :self
+      p.sandbox_inline_content false
+    end
+
+    assert_equal "default-src 'self'", content_security_policy_for("inline")
+  end
+
+  def test_sandbox_inline_content_takes_precedence_over_sandbox_of_content_security_policy
+    @env["action_dispatch.sandbox_inline_content"] = true
+    @env["action_dispatch.content_security_policy"] = ActionDispatch::ContentSecurityPolicy.new do |p|
+      p.sandbox "allow-scripts"
+    end
+
+    assert_equal "sandbox", content_security_policy_for("inline")
+    assert_equal "sandbox allow-scripts", content_security_policy_for("attachment")
+  end
+
+  def test_does_not_sandbox_other_responses_after_inline_content
+    @env["action_dispatch.sandbox_inline_content"] = true
+
+    assert_equal "default-src 'self'; sandbox", content_security_policy_for("inline")
+    assert_equal "default-src 'self'", content_security_policy_for("attachment")
+    assert_equal "default-src 'self'", content_security_policy_for(nil)
+  end
+
+  def test_does_not_sandbox_inline_content_with_report_only_content_security_policy
+    @env["action_dispatch.sandbox_inline_content"] = true
+    @env["action_dispatch.content_security_policy_report_only"] = true
+
+    assert_nil content_security_policy_for("inline")
+  end
+
+  def test_does_not_override_app_content_security_policy_of_inline_content
+    @env["action_dispatch.sandbox_inline_content"] = true
+
+    assert_equal @default_csp, content_security_policy_for("inline", { ActionDispatch::Constants::CONTENT_SECURITY_POLICY => @default_csp })
+  end
+
+  def test_does_not_sandbox_not_modified_when_sandbox_inline_content_is_true
+    @env["action_dispatch.sandbox_inline_content"] = true
+
+    assert_nil content_security_policy_for("inline", status: 304)
+  end
+
+  private
+    def content_security_policy_for(disposition, headers = {}, status: 200)
+      headers = headers.merge(ActionDispatch::Constants::CONTENT_DISPOSITION => disposition).compact
+      app = proc { [status, headers, []] }
+      _, headers, _ = Rack::Lint.new(
+        ActionDispatch::ContentSecurityPolicy::Middleware.new(Rack::Lint.new(app))
+      ).call(@env)
+
+      headers[ActionDispatch::Constants::CONTENT_SECURITY_POLICY]
+    end
 end
 
 class DefaultContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
@@ -493,8 +634,24 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
       p.frame_ancestors :none
     end
 
+    content_security_policy only: [:data, :file, :page] do |p|
+      p.sandbox_inline_content "allow-scripts"
+    end
+
     def index
       head :ok
+    end
+
+    def data
+      send_data "<script>alert(1)</script>", type: "text/html", disposition: params[:disposition]
+    end
+
+    def file
+      send_file __FILE__, disposition: params[:disposition]
+    end
+
+    def page
+      render html: "page"
     end
 
     def inline
@@ -535,10 +692,26 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
       end
   end
 
+  class StreamController < ActionController::Base
+    include ActionController::Live
+
+    content_security_policy do |p|
+      p.sandbox_inline_content "allow-scripts"
+    end
+
+    def stream
+      send_stream(filename: "file.html", disposition: params[:disposition]) { |stream| stream.write "stream" }
+    end
+  end
+
   ROUTES = ActionDispatch::Routing::RouteSet.new
   ROUTES.draw do
     scope module: "content_security_policy_integration_test" do
       get "/", to: "policy#index"
+      get "/data", to: "policy#data"
+      get "/stream", to: "stream#stream"
+      get "/file", to: "policy#file"
+      get "/page", to: "policy#page"
       get "/inline", to: "policy#inline"
       get "/conditional", to: "policy#conditional"
       get "/report-only", to: "policy#report_only"
@@ -582,6 +755,39 @@ class ContentSecurityPolicyIntegrationTest < ActionDispatch::IntegrationTest
 
   def test_generates_content_security_policy_header
     get "/"
+    assert_policy "default-src 'self'"
+  end
+
+  def test_sandboxes_inline_send_data_with_sandbox_inline_content
+    get "/data", params: { disposition: "inline" }
+    assert_policy "default-src 'self'; sandbox allow-scripts"
+
+    get "/data", params: { disposition: "attachment" }
+    assert_policy "default-src 'self'"
+
+    get "/data"
+    assert_nil response.headers["Content-Disposition"]
+    assert_policy "default-src 'self'"
+  end
+
+  def test_sandboxes_inline_send_file_with_sandbox_inline_content
+    get "/file", params: { disposition: "inline" }
+    assert_policy "default-src 'self'; sandbox allow-scripts"
+
+    get "/file", params: { disposition: "attachment" }
+    assert_policy "default-src 'self'"
+  end
+
+  def test_sandboxes_inline_send_stream_with_sandbox_inline_content
+    get "/stream", params: { disposition: "inline" }
+    assert_policy "default-src 'self'; sandbox allow-scripts"
+
+    get "/stream", params: { disposition: "attachment" }
+    assert_policy "default-src 'self'"
+  end
+
+  def test_does_not_sandbox_other_responses_with_sandbox_inline_content
+    get "/page"
     assert_policy "default-src 'self'"
   end
 

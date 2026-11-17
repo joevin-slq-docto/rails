@@ -65,6 +65,7 @@ Below are the default values associated with each target version. In cases of co
 - [`config.action_controller.forgery_protection_verification_strategy`](#config-action-controller-forgery-protection-verification-strategy): `:header_only`
 - [`config.action_controller.rescue_from_event_backtrace`](#config-action-controller-rescue-from-event-backtrace): `:array`
 - [`config.action_dispatch.default_headers`](#config-action-dispatch-default-headers): `{ "X-Frame-Options" => "SAMEORIGIN", "X-Content-Type-Options" => "nosniff", "X-Permitted-Cross-Domain-Policies" => "none", "Referrer-Policy" => "strict-origin-when-cross-origin" }`
+- [`config.action_dispatch.sandbox_inline_content`](#config-action-dispatch-sandbox-inline-content): `true`
 - [`config.action_dispatch.strict_accept_header`](#config-action-dispatch-strict-accept-header): `true`
 - [`config.action_view.erb_implementation`](#config-action-view-erb-implementation): `:herb`
 - [`config.active_job.enqueue_after_transaction_commit`](#config-active-job-enqueue-after-transaction-commit): `true`
@@ -2659,6 +2660,30 @@ The default value depends on the `config.load_defaults` target version:
 
 Enables logging those unhandled exceptions configured in `rescue_responses`. It
 defaults to `true`.
+
+#### `config.action_dispatch.sandbox_inline_content`
+
+Adds the `sandbox` directive to the `Content-Security-Policy` of responses
+whose `Content-Disposition` is `inline`, so that an HTML or SVG file cannot
+run scripts in the origin of the application. Set it to sandbox values, such
+as `"allow-scripts"` or `%w[allow-scripts allow-popups]`, to relax the sandbox.
+
+It has no effect on a report-only policy, or when the response already has a
+`Content-Security-Policy` header.
+
+A policy overrides it with `sandbox_inline_content`, whatever the value of this
+configuration. Pass values to relax the sandbox, or `false` to remove it:
+
+```ruby
+content_security_policy(only: :preview) { |policy| policy.sandbox_inline_content "allow-scripts" }
+```
+
+The default value depends on the `config.load_defaults` target version:
+
+| Starting with version | The default value is |
+| --------------------- | -------------------- |
+| (original)            | `false`              |
+| 8.2                   | `true`               |
 
 #### `config.action_dispatch.show_exceptions`
 
